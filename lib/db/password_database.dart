@@ -36,7 +36,10 @@ class PasswordDatabase {
 
   static Future<List<PasswordEntry>> getAllPasswords() async {
     final db = await getDatabase();
-    final List<Map<String, dynamic>> maps = await db.query('passwords');
+    final List<Map<String, dynamic>> maps = await db.query(
+    'passwords',
+    orderBy: 'platform COLLATE NOCASE ASC', // case-insensitive alphabetical order
+  );
 
     return List.generate(maps.length, (i) {
       return PasswordEntry.fromMap(maps[i]);
