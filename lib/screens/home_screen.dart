@@ -12,16 +12,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<PasswordEntry> passwordList = [];
+  List<PasswordEntry> filteredList = [];
+  TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPasswords();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _loadPasswords() async {
     final data = await PasswordDatabase.getAllPasswords();
-    setState(() => passwordList = data);
+    setState(() {
+      passwordList = data;
+      filteredList = data;
+    });
+  }
+
+  void _filterPasswords(String query) {
+    final results = passwordList.where((entry) {
+      return entry.platform.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    setState(() {
+      filteredList = results;
+    });
   }
 
   void _exportPasswords(BuildContext context) async {
     try {
-      final List<PasswordEntry> entries =
-          await PasswordDatabase.getAllPasswords();
+      final entries = await PasswordDatabase.getAllPasswords();
       await ExcelExporter.exportToExcel(entries);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Exported to Excel successfully!")),
@@ -34,12 +60,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadPasswords();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -49,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.more_vert),
             onSelected: (value) {
               if (value == 'excel') {
-                _exportPasswords(context); // Your export function
+                _exportPasswords(context);
               }
             },
             itemBuilder: (BuildContext context) => [
@@ -67,37 +87,61 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: passwordList.isEmpty
-          ? Center(child: Text('No passwords added yet.'))
-          : ListView.builder(
-              itemCount: passwordList.length,
-              itemBuilder: (context, index) {
-                final entry = passwordList[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                  child: ListTile(
-                    title: Text(
-                      entry.platform,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(entry.account),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ViewPasswordScreen(entry: entry),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(10.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onChanged: _filterPasswords,
+            ),
+          ),
+          Expanded(
+            child: filteredList.isEmpty
+                ? Center(child: Text('No passwords found.'))
+                : ListView.builder(
+                    itemCount: filteredList.length,
+                    itemBuilder: (context, index) {
+                      final entry = filteredList[index];
+                      return Card(
+                        margin: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        child: ListTile(
+                          title: Text(
+                            entry.platform,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(entry.account),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ViewPasswordScreen(entry: entry),
+                              ),
+                            );
+                            _loadPasswords();
+                          },
                         ),
                       );
-                      _loadPasswords();
                     },
                   ),
-                );
-              },
-            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
